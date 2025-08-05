@@ -41,7 +41,19 @@
                             <label class="form-check-label" for="remember">{{ __('Remember Me') }}</label>
                         </div>
                         <div class="d-grid mb-3">
-                            <button class="btn btn-primary" type="submit">{{ __('Login') }}</button>
+                            <button class="btn btn-primary mb-3" type="submit">{{ __('Login') }}</button>
+                            
+                            <!-- Divider with text -->
+                            <div class="position-relative my-3">
+                                <hr>
+                                <span class="position-absolute top-50 start-50 translate-middle bg-white px-2 text-muted small">or continue with</span>
+                            </div>
+                            
+                            <!-- Google Login Button -->
+                            <a href="{{ route('login.google') }}" class="btn btn-outline-danger d-flex align-items-center justify-content-center">
+                                <img src="https://www.google.com/favicon.ico" alt="Google" style="width: 20px; margin-right: 10px;">
+                                {{ __('Login with Google') }}
+                            </a>
                         </div>
                         @if (Route::has('password.request'))
                             <div class="mb-2 text-center">

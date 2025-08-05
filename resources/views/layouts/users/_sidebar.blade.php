@@ -31,7 +31,7 @@
         <li class="menu-item">
             <a href="{{ route('catches.index') }}" class="menu-link">
                 <i class="menu-icon tf-icons bx bx-list-ul"></i>
-                <div data-i18n="View My Catches">View My Catches</div>
+                <div data-i18n="View My Catches">View Reports</div>
             </a>
         </li>
 

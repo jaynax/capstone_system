@@ -217,8 +217,15 @@
                                         <input type="number" class="form-control" id="days_fished" name="days_fished" required>
                                     </div>
                                     <div class="col-md-6 mb-3">
-                                        <label for="fishing_location" class="form-label">Fishing Location (Grid/Coordinates):</label>
-                                        <input type="text" class="form-control" id="fishing_location" name="fishing_location">
+                                        <label for="fishing_location" class="form-label">Fishing Location (Click on the map or enter coordinates):</label>
+                                        <div id="map" style="height: 300px; margin-bottom: 15px; border-radius: 5px;"></div>
+                                        <div class="input-group mb-3">
+                                            <span class="input-group-text">Latitude</span>
+                                            <input type="number" step="0.000001" class="form-control" id="latitude" name="latitude" placeholder="e.g. 12.8797">
+                                            <span class="input-group-text">Longitude</span>
+                                            <input type="number" step="0.000001" class="form-control" id="longitude" name="longitude" placeholder="e.g. 121.7740">
+                                        </div>
+                                        <input type="hidden" id="fishing_location" name="fishing_location">
                                     </div>
                                     <div class="col-md-6 mb-3">
                                         <label class="form-label">Payao Used?</label>
@@ -489,7 +496,93 @@
     </div>
 </div>
 
+<!-- Leaflet CSS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+    crossorigin=""/>
+<!-- Leaflet JavaScript -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+    crossorigin=""></script>
+
 <script>
+// Initialize the map centered on the Philippines
+const map = L.map('map').setView([12.8797, 121.7740], 6);
+
+// Add OpenStreetMap tiles
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    maxZoom: 19
+}).addTo(map);
+
+// Add a marker that can be dragged
+let marker = null;
+
+// Function to update the marker position
+function updateMarker(lat, lng) {
+    // Remove existing marker if any
+    if (marker) {
+        map.removeLayer(marker);
+    }
+    
+    // Add new marker
+    marker = L.marker([lat, lng], {draggable: true}).addTo(map);
+    
+    // Update coordinates when marker is dragged
+    marker.on('dragend', function(e) {
+        const position = marker.getLatLng();
+        updateCoordinateInputs(position.lat, position.lng);
+    });
+    
+    // Center the map on the marker
+    map.setView([lat, lng], map.getZoom());
+    
+    // Update the hidden input field
+    document.getElementById('fishing_location').value = `${lat}, ${lng}`;
+}
+
+// Function to update coordinate input fields
+function updateCoordinateInputs(lat, lng) {
+    document.getElementById('latitude').value = lat.toFixed(6);
+    document.getElementById('longitude').value = lng.toFixed(6);
+    document.getElementById('fishing_location').value = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+}
+
+// Add click event to the map
+map.on('click', function(e) {
+    const lat = e.latlng.lat;
+    const lng = e.latlng.lng;
+    updateMarker(lat, lng);
+    updateCoordinateInputs(lat, lng);
+});
+
+// Update marker when coordinates are manually entered
+function updateFromInputs() {
+    const lat = parseFloat(document.getElementById('latitude').value);
+    const lng = parseFloat(document.getElementById('longitude').value);
+    
+    if (!isNaN(lat) && !isNaN(lng)) {
+        updateMarker(lat, lng);
+    }
+}
+
+// Add event listeners to coordinate inputs
+document.getElementById('latitude').addEventListener('change', updateFromInputs);
+document.getElementById('longitude').addEventListener('change', updateFromInputs);
+
+// Add a scale control
+L.control.scale().addTo(map);
+
+// Add a default marker if coordinates are already set
+window.addEventListener('load', function() {
+    const latInput = document.getElementById('latitude');
+    const lngInput = document.getElementById('longitude');
+    
+    if (latInput.value && lngInput.value) {
+        updateMarker(parseFloat(latInput.value), parseFloat(lngInput.value));
+    }
+});
+
 let lengthRowCount = 1;
 let stream = null;
 let capturedImage = null;

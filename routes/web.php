@@ -6,6 +6,11 @@ use Illuminate\Support\Facades\Route;
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
 use App\Http\Controllers\FishCatchController;
+use App\Http\Controllers\Auth\GoogleAuthController;
+
+// Include test routes
+require __DIR__.'/oauth-test.php';
+require __DIR__.'/test-oauth.php';
 
 /*
 |--------------------------------------------------------------------------
@@ -44,6 +49,10 @@ Route::post('/register', function (Request $request) {
     Auth::login($user);
     return redirect('/dashboard');
 });
+
+// Google OAuth Routes
+Route::get('/auth/google', [GoogleAuthController::class, 'redirectToGoogle'])->name('login.google');
+Route::get('/auth/google/callback', [GoogleAuthController::class, 'handleGoogleCallback']);
 
 // Login form
 Route::get('/login', function () {
@@ -158,6 +167,10 @@ Route::post('/logout', function () {
 })->name('logout');
 
 Route::post('/predict', [FishCatchController::class, 'predict'])->name('predict');
+
+// ML API health check routes
+Route::get('/ml/health', [FishCatchController::class, 'mlApiHealth'])->name('ml.health');
+Route::get('/ml/models', [FishCatchController::class, 'mlApiModels'])->name('ml.models');
 
 // Test route to verify database structure
 Route::get('/test-db', function() {

@@ -6,9 +6,12 @@ use Illuminate\Http\Request;
 use App\Models\FishCatch;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Log;
 
 class FishCatchController extends Controller
 {
+    private $mlApiUrl = 'http://localhost:5000';
+
     public function store(Request $request)
     {
         // Check if we're in automatic mode (image is provided) or manual mode
@@ -94,12 +97,145 @@ class FishCatchController extends Controller
 
     public function predict(Request $request)
     {
-        $image = $request->file('image');
-        $response = Http::attach(
-            'image', file_get_contents($image), $image->getClientOriginalName()
-        )->post('http://localhost:5000/predict');
+        try {
+            // Validate the request
+            $request->validate([
+                'image' => 'required|image|mimes:jpeg,png,jpg,gif|max:10240'
+            ]);
 
-        return $response->json();
+        $image = $request->file('image');
+            
+            // Log the prediction request
+            Log::info('ML Prediction Request', [
+                'user_id' => auth()->id(),
+                'filename' => $image->getClientOriginalName(),
+                'size' => $image->getSize(),
+                'mime_type' => $image->getMimeType()
+            ]);
+
+            // Check if ML API is available
+            $healthCheck = Http::timeout(5)->get($this->mlApiUrl . '/health');
+            
+            if (!$healthCheck->successful()) {
+                Log::error('ML API Health Check Failed', [
+                    'status' => $healthCheck->status(),
+                    'response' => $healthCheck->body()
+                ]);
+                
+                return response()->json([
+                    'error' => 'ML API is not available. Please try again later.',
+                    'details' => 'The machine learning service is currently unavailable.'
+                ], 503);
+            }
+
+            // Send image to ML API for processing
+            $response = Http::timeout(30)->attach(
+                'image', 
+                file_get_contents($image), 
+                $image->getClientOriginalName()
+            )->post($this->mlApiUrl . '/predict');
+
+            if (!$response->successful()) {
+                Log::error('ML API Prediction Failed', [
+                    'status' => $response->status(),
+                    'response' => $response->body()
+                ]);
+                
+                return response()->json([
+                    'error' => 'Failed to process image with ML models.',
+                    'details' => 'The image could not be processed. Please try again.'
+                ], 500);
+            }
+
+            $predictionData = $response->json();
+
+            // Log successful prediction
+            Log::info('ML Prediction Success', [
+                'user_id' => auth()->id(),
+                'species' => $predictionData['species'] ?? 'Unknown',
+                'confidence' => $predictionData['confidence_score'] ?? 0,
+                'length_cm' => $predictionData['length_cm'] ?? 0
+            ]);
+
+            // Return the prediction results
+            return response()->json($predictionData);
+
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            Log::error('ML Prediction Validation Error', [
+                'errors' => $e->errors()
+            ]);
+            
+            return response()->json([
+                'error' => 'Invalid image format or size.',
+                'details' => 'Please upload a valid image (JPEG, PNG, JPG, GIF) under 10MB.'
+            ], 422);
+
+        } catch (\Exception $e) {
+            Log::error('ML Prediction Error', [
+                'message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine()
+            ]);
+            
+            return response()->json([
+                'error' => 'An unexpected error occurred during image processing.',
+                'details' => 'Please try again later or contact support if the problem persists.'
+            ], 500);
+        }
+    }
+
+    public function mlApiHealth()
+    {
+        try {
+            $response = Http::timeout(5)->get($this->mlApiUrl . '/health');
+            
+            if ($response->successful()) {
+                return response()->json([
+                    'status' => 'healthy',
+                    'ml_api' => $response->json(),
+                    'message' => 'ML API is running properly'
+                ]);
+            } else {
+                return response()->json([
+                    'status' => 'unhealthy',
+                    'ml_api' => null,
+                    'message' => 'ML API is not responding'
+                ], 503);
+            }
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'ml_api' => null,
+                'message' => 'Cannot connect to ML API: ' . $e->getMessage()
+            ], 503);
+        }
+    }
+
+    public function mlApiModels()
+    {
+        try {
+            $response = Http::timeout(5)->get($this->mlApiUrl . '/models');
+            
+            if ($response->successful()) {
+                return response()->json([
+                    'status' => 'success',
+                    'models' => $response->json(),
+                    'message' => 'ML models information retrieved successfully'
+                ]);
+            } else {
+                return response()->json([
+                    'status' => 'error',
+                    'models' => null,
+                    'message' => 'Failed to get ML models information'
+                ], 500);
+            }
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'models' => null,
+                'message' => 'Cannot connect to ML API: ' . $e->getMessage()
+            ], 503);
+        }
     }
 
     public function index()
